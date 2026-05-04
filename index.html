@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>استعلام سعر صنف</title>
+
+<style>
+:root{
+  --primary:#2563eb;
+  --dark:#0f172a;
+  --bg:#f1f5f9;
+  --card:#ffffff;
+  --muted:#64748b;
+  --border:#e2e8f0;
+  --success:#16a34a;
+  --danger:#dc2626;
+}
+
+*{box-sizing:border-box}
+
+body{
+  margin:0;
+  font-family:Tahoma,Arial,sans-serif;
+  background:linear-gradient(135deg,#dbeafe,#f8fafc);
+  min-height:100vh;
+  color:#0f172a;
+}
+
+.page{
+  max-width:850px;
+  margin:auto;
+  padding:18px;
+}
+
+.header{
+  background:var(--dark);
+  color:white;
+  padding:22px;
+  border-radius:22px;
+  text-align:center;
+  margin-bottom:18px;
+  box-shadow:0 12px 30px rgba(15,23,42,.2);
+}
+
+.header h1{
+  margin:0 0 8px;
+  font-size:26px;
+}
+
+.header p{
+  margin:0;
+  color:#cbd5e1;
+  font-size:14px;
+}
+
+.card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:22px;
+  padding:20px;
+  box-shadow:0 10px 28px rgba(15,23,42,.08);
+}
+
+.search-box{
+  display:flex;
+  gap:10px;
+  margin-bottom:12px;
+}
+
+input,button{
+  font-family:Tahoma,Arial;
+  font-size:16px;
+  padding:14px;
+  border-radius:14px;
+}
+
+input{
+  flex:1;
+  border:1px solid #cbd5e1;
+  outline:none;
+}
+
+input:focus{
+  border-color:var(--primary);
+  box-shadow:0 0 0 3px rgba(37,99,235,.15);
+}
+
+button{
+  width:130px;
+  border:none;
+  background:var(--primary);
+  color:white;
+  cursor:pointer;
+  font-weight:bold;
+}
+
+button:hover{filter:brightness(.95)}
+
+.camera-btn{
+  background:#16a34a;
+}
+
+.stop-btn{
+  background:#dc2626;
+  margin-top:10px;
+  width:100%;
+}
+
+.message{
+  min-height:24px;
+  margin:10px 0;
+  font-weight:bold;
+  font-size:14px;
+}
+
+.success{color:var(--success)}
+.error{color:var(--danger)}
+.muted{color:var(--muted)}
+
+.hidden{
+  display:none!important;
+}
+
+.scanner-box{
+  margin-top:12px;
+  background:#020617;
+  border-radius:18px;
+  padding:12px;
+  text-align:center;
+}
+
+#reader{
+  width:100%;
+  max-width:420px;
+  margin:auto;
+  background:white;
+  border-radius:14px;
+  overflow:hidden;
+}
+
+.result-list{
+  display:grid;
+  gap:12px;
+  margin-top:14px;
+}
+
+.item-card{
+  border:1px solid var(--border);
+  border-radius:18px;
+  padding:16px;
+  background:#f8fafc;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+}
+
+.item-name{
+  font-size:18px;
+  font-weight:bold;
+  margin-bottom:6px;
+}
+
+.item-barcode{
+  color:var(--muted);
+  font-size:13px;
+}
+
+.price{
+  background:#dcfce7;
+  color:#166534;
+  padding:12px 16px;
+  border-radius:16px;
+  font-size:20px;
+  font-weight:bold;
+  white-space:nowrap;
+}
+
+.empty{
+  text-align:center;
+  color:var(--muted);
+  padding:28px;
+  border:1px dashed #cbd5e1;
+  border-radius:18px;
+  background:#f8fafc;
+}
+
+@media(max-width:650px){
+  .search-box{
+    flex-direction:column;
+  }
+
+  button{
+    width:100%;
+  }
+
+  .item-card{
+    flex-direction:column;
+    align-items:stretch;
+  }
+
+  .price{
+    text-align:center;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<div class="page">
+
+  <div class="header">
+    <h1>🔍 استعلام سعر صنف</h1>
+    <p>أدخل اسم الصنف أو امسح الباركود من كاميرا الهاتف</p>
+  </div>
+
+  <div class="card">
+
+    <div class="search-box">
+      <input type="text" id="itemKey" placeholder="اكتب اسم الصنف أو امسح الباركود..." autofocus>
+      <button onclick="loadItemPrice()">بحث</button>
+      <button class="camera-btn" onclick="startScanner()">📷 كاميرا</button>
+    </div>
+
+    <div id="scannerBox" class="scanner-box hidden">
+      <div id="reader"></div>
+      <button class="stop-btn" onclick="stopScanner()">إيقاف الكاميرا</button>
+    </div>
+
+    <div id="msg" class="message muted">جاهز للبحث...</div>
+
+    <div id="results" class="result-list">
+      <div class="empty">لا توجد نتائج بعد</div>
+    </div>
+
+  </div>
+
+</div>
+
+<script src="https://unpkg.com/html5-qrcode"></script>
+
+<script>
+/*
+  مهم:
+  هذا الرابط لازم يكون رابط Cloudflare الخاص بالـ API على بورت 8080
+  وليس رابط XAMPP إذا كان XAMPP فقط لعرض صفحة HTML.
+*/
+const API = "https://prix-bean-attributes-mills.trycloudflare.com/";
+
+let html5QrCode = null;
+let scannerRunning = false;
+
+function money(v){
+  return Number(v || 0).toFixed(2);
+}
+
+function setMsg(text, type){
+  const el = document.getElementById("msg");
+  el.className = "message " + (type || "muted");
+  el.innerHTML = text || "";
+}
+
+function safeText(v){
+  return (v === null || v === undefined) ? "" : String(v);
+}
+
+async function loadItemPrice(){
+  const keyInput = document.getElementById("itemKey");
+  const key = keyInput.value.trim();
+  const results = document.getElementById("results");
+
+  if(!key){
+    setMsg("يرجى إدخال اسم الصنف أو الباركود", "error");
+    keyInput.focus();
+    return;
+  }
+
+  try{
+    setMsg("جاري البحث...", "muted");
+    results.innerHTML = "";
+
+    const res = await fetch(API + "/api/item-price?key=" + encodeURIComponent(key));
+    const data = await res.json();
+
+    if(!data.success){
+      setMsg(data.message || "فشل البحث", "error");
+      results.innerHTML = '<div class="empty">لا توجد نتائج</div>';
+      return;
+    }
+
+    if(!data.items || data.items.length === 0){
+      setMsg("لا توجد نتائج مطابقة", "error");
+      results.innerHTML = '<div class="empty">لا توجد نتائج لهذا البحث</div>';
+      return;
+    }
+
+    setMsg("عدد النتائج: " + data.count, "success");
+
+    results.innerHTML = "";
+
+    data.items.forEach(function(x){
+      results.innerHTML += `
+        <div class="item-card">
+          <div>
+            <div class="item-name">${safeText(x.item_name)}</div>
+            <div class="item-barcode">الباركود: ${safeText(x.barcode)}</div>
+          </div>
+          <div class="price">${money(x.sale_price)} د.أ</div>
+        </div>
+      `;
+    });
+
+  }catch(err){
+    setMsg("فشل الاتصال بالـ API: " + err.message, "error");
+    results.innerHTML = '<div class="empty">تعذر الاتصال بالخادم</div>';
+  }
+}
+
+function startScanner(){
+  if(scannerRunning) return;
+
+  const scannerBox = document.getElementById("scannerBox");
+  scannerBox.classList.remove("hidden");
+
+  setMsg("جاري تشغيل الكاميرا...", "muted");
+
+  html5QrCode = new Html5Qrcode("reader");
+  scannerRunning = true;
+
+  const config = {
+    fps: 10,
+    qrbox: { width: 280, height: 140 },
+    aspectRatio: 1.777
+  };
+
+  Html5Qrcode.getCameras().then(function(devices){
+    if(!devices || devices.length === 0){
+      setMsg("لم يتم العثور على كاميرا", "error");
+      stopScanner();
+      return;
+    }
+
+    let cameraId = devices[0].id;
+
+    const backCam = devices.find(function(d){
+      const label = (d.label || "").toLowerCase();
+      return label.includes("back") ||
+             label.includes("rear") ||
+             label.includes("environment") ||
+             label.includes("خلف");
+    });
+
+    if(backCam){
+      cameraId = backCam.id;
+    }
+
+    html5QrCode.start(
+      cameraId,
+      config,
+      function(decodedText){
+        const barcode = decodedText.trim();
+
+        document.getElementById("itemKey").value = barcode;
+        setMsg("تم قراءة الباركود: " + barcode, "success");
+
+        stopScanner();
+        loadItemPrice();
+      },
+      function(errorMessage){
+        // تجاهل أخطاء القراءة أثناء تحريك الكاميرا
+      }
+    ).catch(function(err){
+      setMsg("فشل تشغيل الكاميرا: " + err, "error");
+      scannerRunning = false;
+      scannerBox.classList.add("hidden");
+    });
+
+  }).catch(function(err){
+    setMsg("فشل الوصول إلى الكاميرا: " + err, "error");
+    stopScanner();
+  });
+}
+
+function stopScanner(){
+  const scannerBox = document.getElementById("scannerBox");
+
+  if(!html5QrCode){
+    scannerRunning = false;
+    scannerBox.classList.add("hidden");
+    return;
+  }
+
+  if(!scannerRunning){
+    scannerBox.classList.add("hidden");
+    return;
+  }
+
+  html5QrCode.stop().then(function(){
+    html5QrCode.clear();
+    html5QrCode = null;
+    scannerRunning = false;
+    scannerBox.classList.add("hidden");
+  }).catch(function(){
+    html5QrCode = null;
+    scannerRunning = false;
+    scannerBox.classList.add("hidden");
+  });
+}
+
+document.getElementById("itemKey").addEventListener("keydown", function(e){
+  if(e.key === "Enter"){
+    e.preventDefault();
+    loadItemPrice();
+  }
+});
+</script>
+
+</body>
+</html>
